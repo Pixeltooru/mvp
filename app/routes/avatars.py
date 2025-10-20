@@ -31,7 +31,7 @@ def build_router(get_db_dep, get_current_user_dep, encrypt_data):
     async def get_avatar(user_unique_id: str, current_user = Depends(get_current_user_dep), db: AsyncSession = Depends(get_db_dep)):
         # Возвращаем зашифрованный аватар и mime; клиент сам расшифрует
         from sqlalchemy import select
-        stmt = select(type(current_user)).filter(type(current_user).unique_id == int(user_unique_id))
+        stmt = select(type(current_user)).filter(type(current_user).unique_id == user_unique_id)
         res = await db.execute(stmt)
         target = res.scalar_one_or_none()
         if not target or not target.encrypted_avatar:

@@ -1,0 +1,2 @@
+C:/Users/pc/Desktop/servermvp/flutter/mvp/android/app/.cxx/Debug/5l6w2q70/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/pc/Desktop/servermvp/flutter/mvp/android/app/.cxx/Debug/5l6w2q70/arm64-v8a/CMakeFiles/rebuild_cache.dir

@@ -102,7 +102,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if not sub or len(sub) != 8 or not sub.isdigit():
         raise HTTPException(status_code=401, detail="Недопустимый токен: неверный идентификатор пользователя")
     async with db.begin():
-        stmt = select(User).filter(User.unique_id == int(sub))
+        stmt = select(User).filter(User.unique_id == sub)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         if not user:

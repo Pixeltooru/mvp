@@ -1,5 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import declarative_base
 
 
@@ -10,14 +11,14 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    unique_id = Column(Integer, unique=True, index=True)
+    unique_id = Column(String(8), unique=True, index=True, nullable=False)
     hashed_phone = Column(String(64), unique=True, index=True, nullable=True)
     encrypted_phone = Column(Text, nullable=True)
     encrypted_name = Column(Text, nullable=True)
     encrypted_nickname = Column(Text, nullable=True)
     encrypted_username = Column(Text, nullable=True)
     encrypted_bio = Column(Text, nullable=True)
-    encrypted_avatar = Column(Text, nullable=True)
+    encrypted_avatar = Column(LONGTEXT, nullable=True)
     avatar_mime = Column(String(64), nullable=True)  # Deprecated: use encrypted_avatar_mime
     encrypted_avatar_mime = Column(Text, nullable=True)
     hashed_password = Column(String(255), nullable=False)

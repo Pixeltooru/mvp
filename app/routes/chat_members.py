@@ -23,7 +23,7 @@ def build_router(get_db_dep, get_current_user_dep, Models):
             raise HTTPException(400, detail="Неверные параметры")
         async with db.begin():
             await require_admin(db, current_user.id, chat_id)
-            stmt = select(User).filter(User.unique_id == int(target_uid))
+            stmt = select(User).filter(User.unique_id == target_uid)
             res = await db.execute(stmt)
             target = res.scalar_one_or_none()
             if not target:
@@ -42,7 +42,7 @@ def build_router(get_db_dep, get_current_user_dep, Models):
             raise HTTPException(400, detail="Неверные параметры")
         async with db.begin():
             await require_admin(db, current_user.id, chat_id)
-            stmt_user = select(User).filter(User.unique_id == int(target_uid))
+            stmt_user = select(User).filter(User.unique_id == target_uid)
             res = await db.execute(stmt_user)
             target = res.scalar_one_or_none()
             if not target:
@@ -62,7 +62,7 @@ def build_router(get_db_dep, get_current_user_dep, Models):
             raise HTTPException(400, detail="Неверные параметры")
         async with db.begin():
             await require_admin(db, current_user.id, chat_id)
-            stmt_user = select(User).filter(User.unique_id == int(target_uid))
+            stmt_user = select(User).filter(User.unique_id == target_uid)
             res = await db.execute(stmt_user)
             target = res.scalar_one_or_none()
             if not target:

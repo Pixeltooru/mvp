@@ -34,9 +34,9 @@ def build_router(get_db_dep, get_current_user_dep, redis_client):
             # push to all members' offline queues; WS delivers to online
             from app.models import ChatMember, User
             async with db.begin():
-                rows = await db.execute(select(User.unique_id).join(ChatMember, ChatMember.user_id == User.id).filter(ChatMember.chat_id == int(chat_id)))
+                rows = await db.execute(select(User.unique_id).join(ChatMember, ChatMember.user_id == User.id).filter(ChatMember.chat_id == chat_id))
                 recipients = [str(r[0]) for r in rows.fetchall() if str(r[0]) != str(current_user.unique_id)]
-            offline_delivery = json.dumps({'type': 'relay_delivery', 'message_id': 'srv_' + str(len(data_enc)), 'from': str(current_user.unique_id), 'payload': data_enc, 'chat_id': int(chat_id)})
+            offline_delivery = json.dumps({'type': 'relay_delivery', 'message_id': 'srv_' + str(len(data_enc)), 'from': str(current_user.unique_id), 'payload': data_enc, 'chat_id': chat_id})
             for r in recipients:
                 message_key = f"ws_message:{r}"
                 await redis_client.rpush(message_key, offline_delivery)

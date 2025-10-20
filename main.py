@@ -507,6 +507,9 @@ async def init_db():
                 ("encrypted_bio", "ALTER TABLE users ADD COLUMN encrypted_bio TEXT AFTER encrypted_username"),
                 ("encrypted_avatar", "ALTER TABLE users ADD COLUMN encrypted_avatar LONGTEXT AFTER encrypted_bio"),
                 ("avatar_mime", "ALTER TABLE users ADD COLUMN avatar_mime VARCHAR(64) AFTER encrypted_avatar"),
+                ("encrypted_avatar_mime", "ALTER TABLE users ADD COLUMN encrypted_avatar_mime TEXT AFTER avatar_mime"),
+                ("encrypted_e2e_key_updated", "ALTER TABLE users ADD COLUMN encrypted_e2e_key_updated TEXT AFTER e2e_key_updated"),
+                ("encrypted_last_activity", "ALTER TABLE users ADD COLUMN encrypted_last_activity TEXT AFTER last_activity"),
             ]:
                 result = await conn.execute(text(f"SHOW COLUMNS FROM users LIKE '{col}'"))
                 if not result.fetchone():
@@ -526,8 +529,19 @@ async def init_db():
             except Exception as e:
                 logger.warning(f"Не удалось обновить временные метки: {str(e)}")
             
+            # Создаем все отсутствующие таблицы
             await conn.run_sync(Base.metadata.create_all)
             logger.info("Схема базы данных синхронизирована")
+            
+            # Проверяем и создаем таблицы user_sessions, user_statuses, message_read_statuses
+            for table_name in ['user_sessions', 'user_statuses', 'message_read_statuses']:
+                result = await conn.execute(text(f"SHOW TABLES LIKE '{table_name}'"))
+                if not result.fetchone():
+                    logger.info(f"Таблица {table_name} не существует, создаем через metadata...")
+                    await conn.run_sync(Base.metadata.create_all)
+                    logger.info(f"Таблица {table_name} создана")
+                else:
+                    await ensure_innodb(conn, table_name)
 
         async with database.AsyncSessionLocal() as session:
             async with session.begin():
@@ -563,7 +577,7 @@ async def init_db():
                     generated_count = 0
                     for user in users:
                         uid = await generate_unique_id(session)
-                        user.unique_id = int(uid)
+                        user.unique_id = uid
                         generated_count += 1
                         logger.debug(f"Сгенерирован unique_id {uid} для пользователя id={user.id}")
                     logger.info(f"Сгенерировано {generated_count} unique_id для существующих пользователей")
@@ -1014,7 +1028,7 @@ async def generate_unique_id(db_session: AsyncSession) -> str:
             try:
                 for _ in range(10):
                     uid = str(random.randint(10000000, 99999999))
-                    stmt = select(User).filter(User.unique_id == int(uid))
+                    stmt = select(User).filter(User.unique_id == uid)
                     result = await db_session.execute(stmt)
                     if not result.scalar_one_or_none():
                         logger.debug(f"Сгенерирован уникальный ID: {uid}")
@@ -1050,7 +1064,7 @@ async def register(req: RegisterRequest, request: Request, db: AsyncSession = De
             
             now = datetime.utcnow()
             user = User(
-                unique_id=int(await generate_unique_id(db)),
+                unique_id=await generate_unique_id(db),
                 hashed_phone=hashed_phone,
                 encrypted_phone=encrypt_data(req.phone),
                 encrypted_name=encrypt_data(req.name),
@@ -1099,7 +1113,7 @@ async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(
                 identifier = '+7' + identifier[1:]
             user = None
             if re.match(r'^\d{8}$', identifier):
-                stmt = select(User).filter(User.unique_id == int(identifier))
+                stmt = select(User).filter(User.unique_id == identifier)
                 result = await db.execute(stmt)
                 user = result.scalar_one_or_none()
             else:
@@ -1385,7 +1399,7 @@ async def subscribe(req: SubscribeRequest, current_user: User = Depends(get_curr
         await plugin.execute_hook('pre_subscribe', req, current_user)
     async with db.begin():
         try:
-            stmt = select(User).filter(User.unique_id == int(req.target_id))
+            stmt = select(User).filter(User.unique_id == req.target_id)
             result = await db.execute(stmt)
             target = result.scalar_one_or_none()
             if not target:
@@ -1443,7 +1457,7 @@ async def confirm_subscribe(req: SubscribeRequest, current_user: User = Depends(
     async with db.begin():
         try:
             # Get requester
-            stmt_requester = select(User).filter(User.unique_id == int(req.target_id))
+            stmt_requester = select(User).filter(User.unique_id == req.target_id)
             result_requester = await db.execute(stmt_requester)
             requester = result_requester.scalar_one_or_none()
             if not requester:
@@ -1516,7 +1530,7 @@ async def get_contacts(page: int = 1, per_page: int = 20, current_user: User = D
             paged_ids = subs_unique_ids[start:end]
             contacts = []
             for sub_uid in paged_ids:
-                stmt_user = select(User).filter(User.unique_id == int(sub_uid))
+                stmt_user = select(User).filter(User.unique_id == sub_uid)
                 result_user = await db.execute(stmt_user)
                 sub_user = result_user.scalar_one_or_none()
                 if sub_user:
@@ -1577,7 +1591,7 @@ async def get_profile(user_id: Optional[str] = None, current_user: User = Depend
                 })
             else:
                 # Check subscription
-                stmt_target = select(User.id).filter(User.unique_id == int(user_id))
+                stmt_target = select(User.id).filter(User.unique_id == user_id)
                 result_target = await db.execute(stmt_target)
                 target_pk = result_target.scalar_one_or_none()
                 if not target_pk:
@@ -1837,7 +1851,7 @@ async def get_history(target_id: str, page: int = 1, per_page: int = 50, current
     async with db.begin():
         try:
             # Проверяем подписку
-            stmt_target = select(User.id).filter(User.unique_id == int(target_id))
+            stmt_target = select(User.id).filter(User.unique_id == target_id)
             result_target = await db.execute(stmt_target)
             target_pk = result_target.scalar_one_or_none()
             if not target_pk:

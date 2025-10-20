@@ -1,0 +1,166 @@
+### Обзор
+- **Архитектура**: модульная — `app/models.py` (модели), `app/db.py` (БД/Redis), `app/auth.py` (JWT/аутентификация), `app/ws.py` (WebSocket), `app/routes/*` (HTTP‑роуты).
+- **Транспорт**: HTTP (REST, FastAPI) + WebSocket (двухсторонняя передача и оффлайн‑доставка).
+- **Хранилище**: БД (SQLAlchemy) + Redis (очереди оффлайн‑доставки, история, лимиты).
+- **Безопасность**: JWT RS256, rate‑limit, slow‑mode для каналов, проверка членства/подписок.
+- **E2E**: сервер не расшифровывает контент сообщений — работает с зашифрованными блобами; публичные ключи клиентов хранятся/ротируются.
+
+### Аутентификация
+- Получите публичный ключ сервера (для проверки подписи JWT клиентом при необходимости):
+  GET /public_key → { public_key: string }
+- Регистрация:
+  POST /register
+  - body: { phone, password, name?, nickname?, device_id, public_e2e_key }
+  - результат: { unique_id, public_e2e_key, phone, name, nickname, device_id }
+- Логин:
+  POST /login
+  - body: { identifier, password?, device_id, device_token?, public_e2e_key? }
+  - результат: { access_token, token_type, csrf_token, public_e2e_key?, unique_id, phone?, name?, nickname?, device_id }
+  - device_token — для авто‑логина, если поддерживается клиентом.
+- Зависимые запросы через `Authorization: Bearer <access_token>`.
+
+### Модели (упрощенно)
+- `User`: `unique_id` (8 цифр), зашифрованные поля профиля, `last_activity`.
+- `E2EKey`: зашифрованный публичный ключ пользователя.
+- `SecretE2EKey`: зашифрованный секрет, присланный клиентом (опционально).
+- `Chat`: `type` chat|channel, `is_public`, `invite_code`, `slow_mode_seconds`.
+- `ChatMember`: `role` owner|admin|member.
+
+### Redis‑ключи (основные)
+- Оффлайн‑доставка: `ws_message:{userId}` → список объектов `relay_delivery`.
+- История ЛС: `history:{aUserId}:{bUserId}` (симметрично для обоих направлений).
+- История чата: `history:chat:{chatId}`.
+- Статусы набора: `typing:{fromUserId}:{toUserId}`.
+- Slow‑mode: `slow:{chatId}:{userId}`.
+- JWT blacklist (опционально): `jwt_blacklist:{jti}`.
+- Rate‑limit WS: `ws_rate:{userId}:{ip}`.
+
+### HTTP API
+- Профили/ключи:
+  - GET `/public_key` → PEM публичный ключ RS256 сервера.
+  - GET `/encryption_public_key` → alias `/public_key`.
+  - POST `/e2e/public_key` body: { public_e2e_key } — сохранить/обновить E2E ключ.
+  - POST `/e2e/secret_key` body: { ciphertext } — сохранить зашифрованный секрет.
+  - GET `/e2e/secret_key` — получить сохранённый зашифрованный секрет.
+- Сессии:
+  - GET `/sessions/` — список текущих сессий (минимально).
+  - POST `/sessions/revoke_all` — заглушка под отзыв токенов.
+- Чаты/каналы (`/chats`):
+  - POST `/create` body: { name, type: "chat"|"channel" } → { chat_id, type } — создаёт и добавляет владельца.
+  - POST `/set_public` body: { chat_id, is_public } → { invite? } — переключает видимость; генерирует `invite_code`.
+  - POST `/set_slow_mode` body: { chat_id, seconds } — только owner|admin.
+  - GET `/by_invite/{code}` → { chat_id, name, type } — получить публичный канал по коду.
+- Сообщения (`/messages`):
+  - POST `/send` body: { target_id? (8), chat_id?, data } — отправка ЛС или в чат; кладёт оффлайн‑доставку для адресатов.
+  - GET `/history/dm/{target_id}?page=1&per_page=50` — история ЛС (пагинация).
+  - GET `/history/chat/{chat_id}?page=1&per_page=50` — история чата (пагинация).
+- Системное:
+  - GET `/history/{target_id}` — устаревший (ЛС) вариант, сохранён для обратной совместимости.
+
+Примеры запросов
+- Регистрация
+```bash
+curl -X POST https://host/register -H "Content-Type: application/json" -d '{
+  "phone":"+79990000000","password":"secret12345","name":"User","nickname":"nick",
+  "device_id":"abc-123","public_e2e_key":"-----BEGIN PUBLIC KEY-----..."}'
+```
+- Логин
+```bash
+curl -X POST https://host/login -H "Content-Type: application/json" -d '{
+  "identifier":"12345678","password":"secret12345","device_id":"abc-123"}'
+```
+- Отправка в ЛС
+```bash
+curl -X POST https://host/messages/send -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d '{
+  "target_id":"12345678","data":"<encrypted-blob>"}'
+```
+- Отправка в чат
+```bash
+curl -X POST https://host/messages/send -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d '{
+  "chat_id": 42, "data":"<encrypted-blob>"}'
+```
+- История чата
+```bash
+curl "https://host/messages/history/chat/42?page=1&per_page=50" -H "Authorization: Bearer TOKEN"
+```
+
+### WebSocket API
+- Подключение:
+  - URL: wss://host:8089?token=JWT или через заголовок `Authorization: Bearer JWT`.
+  - Ограничения: по IP `WS_MAX_CONNECTIONS_PER_IP`; по сообщениями в минуту `WS_RATE_LIMIT_MESSAGES`.
+- Форматы сообщений:
+  - ping/pong:
+    - client → {"type":"ping"}
+    - server → {"type":"pong","contacts_status":{ "<uid>": {"status":"online|offline","typing":bool}, ... },"server_version":"..." }
+  - ЛС/чат доставка (encrypted relay):
+    - client → любой зашифрованный `data_enc` (строка) или JSON-оболочка:
+      - {"type":"relay","target":"12345678","payload":"<encrypted-blob>"} — ЛС
+      - {"type":"relay","chat_id":42,"payload":"<encrypted-blob>"} — чат/канал
+    - server → отправителю: {"type":"msg_status","message_id":"...","status":"queued|delivered|rate_limited","from":"me","to":"<uid>"}.
+    - server → получателю(ям): {"type":"relay_delivery","message_id":"...","from":"<uid>","payload":"<encrypted-blob>","chat_id"?:42}
+  - История:
+    - client → {"type":"get_history","target":"12345678"} или {"type":"get_history","chat_id":42}
+    - server → {"type":"history","messages":[ ... ]} — содержимое шифр‑блобов или relay.payload.
+  - Набор текста:
+    - client → {"type":"typing_start","target":"12345678"} | {"type":"typing_stop","target":"12345678"}
+  - Колл‑события (минимально):
+    - client → {"type":"call_start","target":"12345678"} | {"type":"call_end","target":"12345678"}
+    - server → {"type":"call_state","state":"connected|ended","from":"<uid>","to":"<uid>"}
+
+Подтверждения/статусы
+- Отправитель получает `msg_status`:
+  - queued — поставлено в очередь/или отправлено онлайн адресату
+  - delivered — реально отправлено в WS адресата (онлайн)
+  - rate_limited — заблокировано slow‑mode (только каналы/чаты с включенным режимом)
+- Получатели получают `relay_delivery` (WS) либо оффлайн‑очередь в Redis; клиент должен подтянуть по подключению.
+
+### Шифрование (E2E)
+- Сервер не расшифровывает контент сообщений:
+  - Клиент шифрует сообщение публичным ключом собеседника (или схемой чата) и отправляет зашифрованный блоб.
+  - В HTTP/WS тело сообщения — строка `data` или `payload` (зашифрованный JSON/строка).
+- Управление ключами:
+  - При регистрации/логине клиент присылает `public_e2e_key` — сервер хранит зашифрованно.
+  - Клиент может обновить ключ: POST `/e2e/public_key`.
+  - Для дополнительной верификации возможно подписывать полезную нагрузку; сервер может проверить подпись (если присутствует поле `signature`).
+
+Пример клиентской отправки (оболочка relay)
+```json
+{"type":"relay","target":"12345678","payload":"<encrypted-blob-base64>"}
+```
+
+### Права/модерация
+- Чат/канал создаёт владелец (`role=owner`); может назначать `admin` (через отдельные эндпоинты — при необходимости добавим).
+- Публичность канала: только владелец (`/chats/set_public`).
+- Slow‑mode: owner|admin (`/chats/set_slow_mode`).
+- Доступ к истории чата — только участник чата.
+- Отправка в чат — только участник чата.
+
+### Пагинация истории
+- Query: `page` (>=1), `per_page` (1..100).
+- Расчёт: берутся последние элементы из Redis‑списка сдвигом по страницам (обратная индексация).
+- Ответ: { messages, page, per_page, total, pages }.
+
+### Rate limits и защита
+- HTTP middleware: базовый лимит по IP для /login,/register (блокировка по превышению).
+- WS: лимит сообщений per user + per IP (`ws_rate:{user}:{ip}`).
+- Slow‑mode: `slow:{chatId}:{userId}` — задержка между сообщениями этого пользователя в чате.
+
+### Структура директорий (важное)
+- `app/models.py` — SQLAlchemy `Base`, `User`, `E2EKey`, `SecretE2EKey`, `Subscription`, `Chat`, `ChatMember`.
+- `app/db.py` — `engine`, `AsyncSessionLocal`, `redis_client`, `init_db_connections()`, `get_db()`.
+- `app/auth.py` — `create_access_token()`, `verify_token()`, `get_current_user()`, `get_public_key_pem()`.
+- `app/ws.py` — `websocket_handler`, `active_connections`, `make_ws_server()`.
+- `app/routes/*.py` — роутеры FastAPI: `sessions`, `devices`, `avatars`, `chats`, `chat_messages`, `chat_members`, `invites`, `message_mgmt`, `scheduler`.
+- `main.py` — инициализация FastAPI, запуск HTTP и WS‑серверов.
+
+### Быстрый старт с клиента
+1) Зарегистрироваться или войти, получить `access_token`.
+2) Подключить WS: wss://host:8089?token=JWT.
+3) Отправлять сообщения:
+   - ЛС: `{"type":"relay","target":"<8 digits>","payload":"<encrypted>"}`.
+   - Чат: `{"type":"relay","chat_id":<id>,"payload":"<encrypted>"}`.
+4) Получать доставка/статусы через WS.
+5) Историю тянуть по HTTP `/messages/history/...` (или WS `get_history` при необходимости).
+6) Для каналов: получить по инвайту `GET /chats/by_invite/{code}`, вступить (через эндпоинт участников — добавим при необходимости), затем читать/писать.
+
+Если нужна короткая ссылка‑редиректор для `invite_code`, бан/кик, промоут/демоут — допишу отдельные эндпоинты модерации и приглашений.
