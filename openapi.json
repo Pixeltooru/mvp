@@ -1,0 +1,80 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MVP API (Melo Voice Project)",
+    "version": "3.1.1",
+    "description": "API сервера MVP. Большинство эндпоинтов требуют Bearer JWT."
+  },
+  "servers": [
+    {"url": "https://pixeltoo.ru:8088", "description": "Production"},
+    {"url": "https://mlo.pixeltoo.ru:8088", "description": "Staging"}
+  ],
+  "tags": [
+    {"name": "core"}, {"name": "security"}, {"name": "e2e"}, {"name": "push"},
+    {"name": "contacts"}, {"name": "profile"}, {"name": "status"}, {"name": "history"},
+    {"name": "debug"}, {"name": "sessions"}, {"name": "schedule"}, {"name": "devices"},
+    {"name": "chats"}, {"name": "avatar"}, {"name": "messages"}, {"name": "messages_mgmt"}, {"name": "invites"}
+  ],
+  "paths": {
+    "/": {"get": {"tags": ["core"], "summary": "Root endpoint", "responses": {"200": {"description": "OK"}}}},
+    "/public_key": {"get": {"tags": ["security"], "summary": "JWT Public Key (без авторизации)", "responses": {"200": {"description": "OK"}}}},
+    "/encryption_public_key": {"get": {"tags": ["security"], "summary": "Encryption Public Key (alias)", "responses": {"200": {"description": "OK"}}}},
+    "/vapid_public_key": {"get": {"tags": ["push"], "summary": "VAPID Public Key для Web Push", "responses": {"200": {"description": "OK"}}}},
+    "/register": {"post": {"tags": ["security"], "summary": "Регистрация пользователя", "responses": {"200": {"description": "OK"}}}},
+    "/login": {"post": {"tags": ["security"], "summary": "Вход пользователя", "responses": {"200": {"description": "OK"}}}},
+    "/e2e/public_key": {"post": {"tags": ["e2e"], "security": [{"bearerAuth": []}], "summary": "Обновить публичный E2E ключ", "responses": {"200": {"description": "OK"}}}},
+    "/e2e/secret_key": {
+      "post": {"tags": ["e2e"], "security": [{"bearerAuth": []}], "summary": "Сохранить секретный ключ (зашифрованный)", "responses": {"200": {"description": "OK"}}},
+      "get": {"tags": ["e2e"], "security": [{"bearerAuth": []}], "summary": "Получить секретный ключ", "responses": {"200": {"description": "OK"}}}
+    },
+    "/csrf_token": {"get": {"tags": ["security"], "security": [{"bearerAuth": []}], "summary": "Получить CSRF токен", "responses": {"200": {"description": "OK"}}}},
+    "/register_push": {"post": {"tags": ["push"], "security": [{"bearerAuth": []}], "summary": "Зарегистрировать push-подписку", "responses": {"200": {"description": "OK"}}}},
+    "/ice_servers": {"get": {"tags": ["core"], "security": [{"bearerAuth": []}], "summary": "Получить ICE-серверы для WebRTC", "responses": {"200": {"description": "OK"}}}},
+    "/subscribe": {"post": {"tags": ["contacts"], "security": [{"bearerAuth": []}], "summary": "Отправить запрос на подписку", "responses": {"200": {"description": "OK"}}}},
+    "/confirm_subscribe": {"post": {"tags": ["contacts"], "security": [{"bearerAuth": []}], "summary": "Подтвердить подписку", "responses": {"200": {"description": "OK"}}}},
+    "/contacts": {"get": {"tags": ["contacts"], "security": [{"bearerAuth": []}], "summary": "Список контактов (с пагинацией)", "parameters": [{"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}}, {"in": "query", "name": "per_page", "schema": {"type": "integer", "default": 20}}], "responses": {"200": {"description": "OK"}}}},
+    "/profile": {
+      "get": {"tags": ["profile"], "security": [{"bearerAuth": []}], "summary": "Получить профиль (свой или другого)", "parameters": [{"in": "query", "name": "user_id", "schema": {"type": "string"}, "required": false}], "responses": {"200": {"description": "OK"}}},
+      "put": {"tags": ["profile"], "security": [{"bearerAuth": []}], "summary": "Обновить профиль", "responses": {"200": {"description": "OK"}}}
+    },
+    "/statuses": {"get": {"tags": ["status"], "security": [{"bearerAuth": []}], "summary": "Онлайн-статусы и typing флаги", "parameters": [{"in": "query", "name": "user_ids", "required": true, "schema": {"type": "string"}, "description": "Список UID через запятую"}], "responses": {"200": {"description": "OK"}}}},
+    "/history/{target_id}": {"get": {"tags": ["history"], "security": [{"bearerAuth": []}], "summary": "История сообщений с пользователем", "parameters": [{"in": "path", "name": "target_id", "required": true, "schema": {"type": "string"}}, {"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}}, {"in": "query", "name": "per_page", "schema": {"type": "integer", "default": 50}}], "responses": {"200": {"description": "OK"}}}},
+    "/debug/users": {"get": {"tags": ["debug"], "security": [{"bearerAuth": []}], "summary": "Отладочная выдача пользователей (DEBUG_MODE)", "responses": {"200": {"description": "OK"}}}},
+    "/debug/connections": {"get": {"tags": ["debug"], "security": [{"bearerAuth": []}], "summary": "Активные WebSocket-подключения (DEBUG_MODE)", "responses": {"200": {"description": "OK"}}}},
+    "/sessions/": {"get": {"tags": ["sessions"], "security": [{"bearerAuth": []}], "summary": "Список сессий пользователя", "responses": {"200": {"description": "OK"}}}},
+    "/sessions/revoke_all": {"post": {"tags": ["sessions"], "security": [{"bearerAuth": []}], "summary": "Отозвать все сессии", "responses": {"200": {"description": "OK"}}}},
+    "/schedule/message": {"post": {"tags": ["schedule"], "security": [{"bearerAuth": []}], "summary": "Запланировать доставку сообщения", "responses": {"200": {"description": "OK"}}}},
+    "/devices/register": {"post": {"tags": ["devices"], "security": [{"bearerAuth": []}], "summary": "Зарегистрировать устройство", "responses": {"200": {"description": "OK"}}}},
+    "/devices/refresh": {"post": {"tags": ["devices"], "security": [{"bearerAuth": []}], "summary": "Обновить токен устройства", "responses": {"200": {"description": "OK"}}}},
+    "/devices/revoke": {"post": {"tags": ["devices"], "security": [{"bearerAuth": []}], "summary": "Отозвать устройство", "responses": {"200": {"description": "OK"}}}},
+    "/devices/authorize": {"post": {"tags": ["devices"], "summary": "Авторизация устройства (MVP-заглушка)", "responses": {"200": {"description": "OK"}}}},
+    "/chats/create": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Создать чат или канал", "responses": {"200": {"description": "OK"}}}},
+    "/chats/set_public": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Сделать чат публичным/приватным", "responses": {"200": {"description": "OK"}}}},
+    "/chats/set_slow_mode": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Включить slow-mode", "responses": {"200": {"description": "OK"}}}},
+    "/chats/by_invite/{code}": {"get": {"tags": ["chats"], "summary": "Получить чат по инвайт-коду", "parameters": [{"in": "path", "name": "code", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "OK"}}}},
+    "/chats/members/add": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Добавить участника в чат", "responses": {"200": {"description": "OK"}}}},
+    "/chats/members/remove": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Удалить участника из чата", "responses": {"200": {"description": "OK"}}}},
+    "/chats/members/role": {"post": {"tags": ["chats"], "security": [{"bearerAuth": []}], "summary": "Изменить роль участника", "responses": {"200": {"description": "OK"}}}},
+    "/avatar/upload": {"post": {"tags": ["avatar"], "security": [{"bearerAuth": []}], "summary": "Загрузить аватар", "responses": {"200": {"description": "OK"}}}},
+    "/avatar": {"delete": {"tags": ["avatar"], "security": [{"bearerAuth": []}], "summary": "Удалить аватар", "responses": {"200": {"description": "OK"}}}},
+    "/avatar/{user_unique_id}": {"get": {"tags": ["avatar"], "security": [{"bearerAuth": []}], "summary": "Получить зашифрованный аватар", "parameters": [{"in": "path", "name": "user_unique_id", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "OK"}}}},
+    "/messages/send": {"post": {"tags": ["messages"], "security": [{"bearerAuth": []}], "summary": "Отправить сообщение (DM или чат)", "responses": {"200": {"description": "OK"}}}},
+    "/messages/history/dm/{target_id}": {"get": {"tags": ["messages"], "security": [{"bearerAuth": []}], "summary": "История DM с пользователем", "parameters": [{"in": "path", "name": "target_id", "required": true, "schema": {"type": "string"}}, {"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}}, {"in": "query", "name": "per_page", "schema": {"type": "integer", "default": 50}}], "responses": {"200": {"description": "OK"}}}},
+    "/messages/history/chat/{chat_id}": {"get": {"tags": ["messages"], "security": [{"bearerAuth": []}], "summary": "История чата/канала", "parameters": [{"in": "path", "name": "chat_id", "required": true, "schema": {"type": "integer"}}, {"in": "query", "name": "page", "schema": {"type": "integer", "default": 1}}, {"in": "query", "name": "per_page", "schema": {"type": "integer", "default": 50}}], "responses": {"200": {"description": "OK"}}}},
+    "/messages/edit": {"post": {"tags": ["messages_mgmt"], "security": [{"bearerAuth": []}], "summary": "Редактировать сообщение", "responses": {"200": {"description": "OK"}}}},
+    "/messages/delete": {"post": {"tags": ["messages_mgmt"], "security": [{"bearerAuth": []}], "summary": "Удалить сообщение", "responses": {"200": {"description": "OK"}}}},
+    "/messages/pin": {"post": {"tags": ["messages_mgmt"], "security": [{"bearerAuth": []}], "summary": "Закрепить сообщение", "responses": {"200": {"description": "OK"}}}},
+    "/messages/react": {"post": {"tags": ["messages_mgmt"], "security": [{"bearerAuth": []}], "summary": "Реакция на сообщение", "responses": {"200": {"description": "OK"}}}},
+    "/invites/create": {"post": {"tags": ["invites"], "security": [{"bearerAuth": []}], "summary": "Создать инвайт (временный)", "responses": {"200": {"description": "OK"}}}},
+    "/invites/join": {"post": {"tags": ["invites"], "security": [{"bearerAuth": []}], "summary": "Присоединиться по инвайт-коду", "responses": {"200": {"description": "OK"}}}}
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

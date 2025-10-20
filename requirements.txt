@@ -1,0 +1,49 @@
+# MVP - Melo Voice Project by Pixeltoo Lab
+# Python Requirements v3.1.1
+
+# Core Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-dotenv==1.0.1
+pydantic==2.10.3
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+aiomysql==0.2.0
+
+# Authentication & Security
+bcrypt==4.2.1
+pyjwt==2.10.1
+cryptography==44.0.0
+python-multipart==0.0.20
+
+# Redis
+redis[hiredis]==5.2.0
+
+# WebSockets
+websockets==14.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# HTTP Client
+httpx==0.28.1
+
+# Web Push (optional)
+pywebpush==1.14.1
+
+# Retry Logic
+tenacity==9.0.0
+
+# CORS & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Testing (optional)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
+
+# Monitoring (optional)
+psutil==6.1.0

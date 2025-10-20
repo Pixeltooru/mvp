@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+mvp_server.log*
+migration_encrypt.log
+
+# Database
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+
+# Redis
+dump.rdb
+
+# SSL Certificates (НЕ публикуем приватные ключи!)
+*.pem
+*.key
+*.crt
+*.cert
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flutter/Dart (не публикуем клиент)
+flutter/
+
+# Backup files
+backup_*.sql
+backup_*.rdb
+
+# Temporary files
+*.tmp
+*.temp
+
+# JWT keys (НЕ публикуем!)
+jwt_private.pem
+jwt_public.pem
+
+# VAPID keys
+vapid_private.pem
+vapid_public.pem
