@@ -542,6 +542,81 @@ async def init_db():
                     logger.info(f"Таблица {table_name} создана")
                 else:
                     await ensure_innodb(conn, table_name)
+            
+            # Добавляем зашифрованные колонки для user_sessions
+            user_sessions_encrypted_cols = [
+                ("encrypted_device_type", "ALTER TABLE user_sessions ADD COLUMN encrypted_device_type TEXT AFTER device_type"),
+                ("encrypted_device_name", "ALTER TABLE user_sessions ADD COLUMN encrypted_device_name TEXT AFTER device_name"),
+                ("encrypted_ip_address", "ALTER TABLE user_sessions ADD COLUMN encrypted_ip_address TEXT AFTER ip_address"),
+                ("encrypted_user_agent", "ALTER TABLE user_sessions ADD COLUMN encrypted_user_agent TEXT AFTER user_agent"),
+                ("encrypted_created_at", "ALTER TABLE user_sessions ADD COLUMN encrypted_created_at TEXT AFTER created_at"),
+                ("encrypted_last_activity", "ALTER TABLE user_sessions ADD COLUMN encrypted_last_activity TEXT AFTER last_activity"),
+            ]
+            for col, ddl in user_sessions_encrypted_cols:
+                result = await conn.execute(text(f"SHOW COLUMNS FROM user_sessions LIKE '{col}'"))
+                if not result.fetchone():
+                    try:
+                        await conn.execute(text(ddl))
+                        logger.info(f"Столбец user_sessions.{col} добавлен")
+                    except Exception as e:
+                        logger.warning(f"Не удалось добавить user_sessions.{col}: {str(e)}")
+            
+            # Добавляем зашифрованные колонки для user_statuses
+            user_statuses_encrypted_cols = [
+                ("encrypted_last_seen", "ALTER TABLE user_statuses ADD COLUMN encrypted_last_seen TEXT AFTER last_seen"),
+                ("encrypted_updated_at", "ALTER TABLE user_statuses ADD COLUMN encrypted_updated_at TEXT AFTER updated_at"),
+            ]
+            for col, ddl in user_statuses_encrypted_cols:
+                result = await conn.execute(text(f"SHOW COLUMNS FROM user_statuses LIKE '{col}'"))
+                if not result.fetchone():
+                    try:
+                        await conn.execute(text(ddl))
+                        logger.info(f"Столбец user_statuses.{col} добавлен")
+                    except Exception as e:
+                        logger.warning(f"Не удалось добавить user_statuses.{col}: {str(e)}")
+            
+            # Добавляем зашифрованные колонки для message_read_statuses
+            message_read_statuses_encrypted_cols = [
+                ("encrypted_last_read_message_id", "ALTER TABLE message_read_statuses ADD COLUMN encrypted_last_read_message_id TEXT AFTER last_read_message_id"),
+                ("encrypted_read_at", "ALTER TABLE message_read_statuses ADD COLUMN encrypted_read_at TEXT AFTER read_at"),
+                ("encrypted_updated_at", "ALTER TABLE message_read_statuses ADD COLUMN encrypted_updated_at TEXT AFTER updated_at"),
+            ]
+            for col, ddl in message_read_statuses_encrypted_cols:
+                result = await conn.execute(text(f"SHOW COLUMNS FROM message_read_statuses LIKE '{col}'"))
+                if not result.fetchone():
+                    try:
+                        await conn.execute(text(ddl))
+                        logger.info(f"Столбец message_read_statuses.{col} добавлен")
+                    except Exception as e:
+                        logger.warning(f"Не удалось добавить message_read_statuses.{col}: {str(e)}")
+            
+            # Добавляем зашифрованные колонки для chats
+            chats_encrypted_cols = [
+                ("encrypted_name", "ALTER TABLE chats ADD COLUMN encrypted_name TEXT AFTER name"),
+                ("encrypted_created_at", "ALTER TABLE chats ADD COLUMN encrypted_created_at TEXT AFTER created_at"),
+                ("encrypted_invite_code", "ALTER TABLE chats ADD COLUMN encrypted_invite_code TEXT AFTER invite_code"),
+            ]
+            for col, ddl in chats_encrypted_cols:
+                result = await conn.execute(text(f"SHOW COLUMNS FROM chats LIKE '{col}'"))
+                if not result.fetchone():
+                    try:
+                        await conn.execute(text(ddl))
+                        logger.info(f"Столбец chats.{col} добавлен")
+                    except Exception as e:
+                        logger.warning(f"Не удалось добавить chats.{col}: {str(e)}")
+            
+            # Добавляем зашифрованные колонки для chat_members
+            chat_members_encrypted_cols = [
+                ("encrypted_joined_at", "ALTER TABLE chat_members ADD COLUMN encrypted_joined_at TEXT AFTER joined_at"),
+            ]
+            for col, ddl in chat_members_encrypted_cols:
+                result = await conn.execute(text(f"SHOW COLUMNS FROM chat_members LIKE '{col}'"))
+                if not result.fetchone():
+                    try:
+                        await conn.execute(text(ddl))
+                        logger.info(f"Столбец chat_members.{col} добавлен")
+                    except Exception as e:
+                        logger.warning(f"Не удалось добавить chat_members.{col}: {str(e)}")
 
         async with database.AsyncSessionLocal() as session:
             async with session.begin():
